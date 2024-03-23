@@ -6,6 +6,19 @@ library LibAppStorage {
     struct UserBid {
         uint256 amount;
     }
+
+    bytes4 constant ERC721 = 0x73ad2146;
+    bytes4 constant ERC1155 = 0x973bb640;
+
+    struct Auction {
+        address owner;
+        bytes32 nftId;
+        uint256 highestBid;
+        bool settled;
+        address randomDAOAddress;
+        address lastInteractionAddress;
+    }
+
     struct Layout {
         //ERC20
         string name;
@@ -20,5 +33,29 @@ library LibAppStorage {
         mapping(address => UserBid) userDetails;
         address[] bidders;
         uint256 lastBidTime;
+        mapping(uint256 => Auction) auctions;
+        uint256 nextAuctionId;
+    }
+
+    function layoutStorage() internal pure returns (Layout storage l) {
+        assembly {
+            l.slot := 0
+        }
+    }
+
+    function _transferFrom(
+        address _from,
+        address _to,
+        uint256 _amount
+    ) internal {
+        Layout storage l = layoutStorage();
+        uint256 frombalances = l.balances[msg.sender];
+        require(
+            frombalances >= _amount,
+            "ERC20: Not enough tokens to transfer"
+        );
+        l.balances[_from] = frombalances - _amount;
+        l.balances[_to] += _amount;
+        emit Transfer(_from, _to, _amount);
     }
 }
