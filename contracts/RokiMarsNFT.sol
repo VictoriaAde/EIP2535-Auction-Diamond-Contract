@@ -7,11 +7,7 @@ import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/
 contract RokiMarsNFT is ERC721, ERC721URIStorage {
     uint256 private nextTokenId;
 
-    constructor(
-        address initialOwner,
-        string memory name,
-        string memory symbol
-    ) ERC721(name, symbol) {}
+    constructor() ERC721("RokiMarsNFT", "RKT") {}
 
     function safeMint(address to, string memory uri) public returns (uint256) {
         uint256 _tokenId = nextTokenId++;

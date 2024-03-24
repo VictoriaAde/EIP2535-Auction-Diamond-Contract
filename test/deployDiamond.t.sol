@@ -6,6 +6,7 @@ import "../contracts/facets/DiamondCutFacet.sol";
 import "../contracts/facets/DiamondLoupeFacet.sol";
 import "../contracts/facets/OwnershipFacet.sol";
 import "../contracts/Diamond.sol";
+import "../contracts/libraries/LibAppStorage.sol";
 
 import "forge-std/Test.sol";
 import "../contracts/facets/AUC20Facet.sol";
@@ -22,6 +23,15 @@ contract DiamondDeployer is Test, IDiamondCut {
     AuctionFacet aucFacet;
     RokiMarsNFT rokiNFT;
 
+    LibAppStorage.Layout internal l;
+
+    address A = address(0xa);
+    address B = address(0xb);
+    address C = address(0xc);
+
+    AuctionFacet boundAuction;
+    AUC20Facet boundERC;
+
     function setUp() public {
         //deploy facets
         dCutFacet = new DiamondCutFacet();
@@ -31,21 +41,9 @@ contract DiamondDeployer is Test, IDiamondCut {
         auctoken = new AUC20Facet();
         aucFacet = new AuctionFacet();
 
-        //upgrade diamond with facets
-
+        //upgrade diamond with facet
         //build cut struct
         FacetCut[] memory cut = new FacetCut[](4);
-
-        A = mkaddr("staker a");
-        B = mkaddr("staker b");
-        C = mkaddr("staker c");
-
-        //mint test tokens
-        AUC20Facet(address(diamond)).mintTo(A);
-        AUC20Facet(address(diamond)).mintTo(B);
-
-        boundAuction = AuctionFacet(address(diamond));
-        boundERC = AUC20Facet(address(diamond));
 
         cut[0] = (
             FacetCut({
@@ -82,65 +80,99 @@ contract DiamondDeployer is Test, IDiamondCut {
         //upgrade diamond
         IDiamondCut(address(diamond)).diamondCut(cut, address(0x0), "");
 
+        A = mkaddr("staker a");
+        B = mkaddr("staker b");
+        C = mkaddr("staker c");
+
+        //mint test tokens
+        AUC20Facet(address(diamond)).mintTo(A);
+        AUC20Facet(address(diamond)).mintTo(B);
+
+        boundAuction = AuctionFacet(address(diamond));
+        boundERC = AUC20Facet(address(diamond));
+
         //call a function
         DiamondLoupeFacet(address(diamond)).facetAddresses();
     }
 
     function shouldRevertIfTokenAddressIsZero() public {
         vm.expectRevert("INVALID_CONTRACT_ADDRESS");
-        boundAuction.createAuction(address(0), 1, 1e18, 2 days);
+        boundAuction.startAuction(1, 2e18);
     }
 
     function shouldRevertIfNotTokenOwner() public {
         switchSigner(A);
-        erc721Token.mint();
+        rokiNFT.safeMint(
+            A,
+            "ipfs://QmZ7AfnNr2tBots5xrUGXc4EGZEcZdrNJQQZYGxtLowRgU"
+        );
         switchSigner(B);
         vm.expectRevert("NOT_OWNER");
-        boundAuction.createAuction(address(erc721Token), 1, 1e18, 2 days);
+        boundAuction.startAuction(1, 2e18);
     }
 
     function shouldRevertIfInsufficientTokenBalance() public {
         switchSigner(C);
-        erc721Token.mint();
-        erc721Token.approve(address(diamond), 1);
-        boundAuction.createAuction(address(erc721Token), 1, 1e18, 2 days);
+        rokiNFT.safeMint(
+            C,
+            "ipfs://QmZ7AfnNr2tBots5xrUGXc4EGZEcZdrNJQQZYGxtLowRgU"
+        );
+        rokiNFT.approve(address(diamond), 1);
+        boundAuction.startAuction(1, 2e18);
+
         vm.expectRevert("INSUFFICIENT_BALANCE");
-        boundAuction.bid(0, 5e18);
+        boundAuction.placeBid(0, 5e18);
     }
 
     function shouldRevertIfBidAmountIsLessThanAuctionStartPrice() public {
         switchSigner(A);
-        erc721Token.mint();
-        erc721Token.approve(address(diamond), 1);
-        boundAuction.createAuction(address(erc721Token), 1, 2e18, 2 days);
+        rokiNFT.safeMint(
+            A,
+            "ipfs://QmZ7AfnNr2tBots5xrUGXc4EGZEcZdrNJQQZYGxtLowRgU"
+        );
+        rokiNFT.approve(address(diamond), 1);
+        boundAuction.startAuction(1, 2e18);
+
         vm.expectRevert("STARTING_PRICE_MUST_BE_GREATER");
-        boundAuction.bid(0, 1e18);
+        boundAuction.placeBid(0, 1e18);
     }
 
     function shouldRevertIfBidAmountIsLessThanLastBiddedAmount() public {
         switchSigner(A);
-        erc721Token.mint();
-        erc721Token.approve(address(diamond), 1);
-        boundAuction.createAuction(address(erc721Token), 1, 2e18, 2 days);
-        boundAuction.bid(0, 2e18);
+        rokiNFT.safeMint(
+            A,
+            "ipfs://QmZ7AfnNr2tBots5xrUGXc4EGZEcZdrNJQQZYGxtLowRgU"
+        );
+        rokiNFT.approve(address(diamond), 1);
+        boundAuction.startAuction(1, 2e18);
+
+        boundAuction.placeBid(0, 2e18);
         vm.expectRevert("PRICE_MUST_BE_GREATER_THAN_LAST_BIDDED");
-        boundAuction.bid(0, 1e18);
+        boundAuction.placeBid(0, 1e18);
     }
 
     function testBids() public {
         switchSigner(A);
-        erc721Token.mint();
-        erc721Token.approve(address(diamond), 1);
+        rokiNFT.safeMint(
+            A,
+            "ipfs://QmZ7AfnNr2tBots5xrUGXc4EGZEcZdrNJQQZYGxtLowRgU"
+        );
+        rokiNFT.approve(address(diamond), 1);
         boundAuction.startAuction(1, 2e18);
         boundAuction.placeBid(0, 2e18);
         switchSigner(B);
-        boundAuction.bid(0, 3e18);
-        LibAppStorage.Bid[] memory bids = boundAuction.getBid(0);
-        assertEq(bids.length, 2);
-        assertEq(bids[0].author, A);
-        assertEq(bids[0].amount, 2e18);
-        assertEq(bids[1].author, B);
-        assertEq(bids[1].amount, (3e18 - ((10 * 3e18) / 100)));
+        boundAuction.placeBid(0, 3e18);
+
+        // LibAppStorage.Auction[] memory auctions = boundAuction.getBid(0);
+        // LibAppStorage.Auction storage aucs = boundAuction.getBid(0);
+        LibAppStorage.Auction storage aucs1 = l.bids[0];
+        LibAppStorage.Auction storage aucs2 = l.bids[1];
+
+        // assertEq(aucs.length, 2);
+        assertEq(aucs1.owner, A);
+        assertEq(aucs1.amount, 2e18);
+        assertEq(aucs2.owner, B);
+        assertEq(aucs2.amount, (3e18 - ((10 * 3e18) / 100)));
     }
 
     function generateSelectors(
@@ -152,6 +184,26 @@ contract DiamondDeployer is Test, IDiamondCut {
         cmd[2] = _facetName;
         bytes memory res = vm.ffi(cmd);
         selectors = abi.decode(res, (bytes4[]));
+    }
+
+    function mkaddr(string memory name) public returns (address) {
+        address addr = address(
+            uint160(uint256(keccak256(abi.encodePacked(name))))
+        );
+        vm.label(addr, name);
+        return addr;
+    }
+
+    function switchSigner(address _newSigner) public {
+        address foundrySigner = 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38;
+        if (msg.sender == foundrySigner) {
+            vm.startPrank(_newSigner);
+        } else {
+            vm.stopPrank();
+            vm.startPrank(_newSigner);
+        }
+
+        // uint256[] = new uint256[](2);
     }
 
     function diamondCut(

@@ -13,7 +13,7 @@ library LibAppStorage {
 
     struct Auction {
         address owner;
-        bytes32 nftId;
+        uint256 nftId;
         uint256 highestBid;
         bool settled;
         address randomDAOAddress;

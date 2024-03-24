@@ -7,11 +7,11 @@ import {LibAppStorage} from "../libraries/LibAppStorage.sol";
 contract AuctionFacet {
     LibAppStorage.Layout internal l;
 
-    event AuctionStarted(uint256 auctionId, bytes32 nftId, uint256 startingBid);
+    event AuctionStarted(uint256 auctionId, uint256 nftId, uint256 startingBid);
     event BidPlaced(uint256 auctionId, address bidder, uint256 amount);
     event AuctionSettled(uint256 auctionId, address winner, uint256 finalPrice);
 
-    function startAuction(bytes32 _nftId, uint256 _startingBid) public {
+    function startAuction(uint256 _nftId, uint256 _startingBid) public {
         uint256 _auctionId = l.nextAuctionId + 1;
 
         LibAppStorage.Auction storage s = l.auctions[_auctionId];
