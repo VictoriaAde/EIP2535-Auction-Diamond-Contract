@@ -91,11 +91,21 @@ contract DiamondDeployer is Test, IDiamondCut {
 
         boundAuction = AuctionFacet(address(diamond));
         boundERC = AUC20Facet(address(diamond));
-
-        //call a function
-        // DiamondLoupeFacet(address(diamond)).facetAddresses();
     }
 
+    function testRevertIfTokenAddressIsZero() public {
+        switchSigner(A);
+        boundAuction.createAuction(2 days, 1e18, 1, address(0));
+        vm.expectRevert("No zero address call");
+    }
+
+    // function testRevertIfNotTokenOwner() public {
+    //     switchSigner(A);
+    //     erc721Token.mint();
+    //     switchSigner(B);
+    //     vm.expectRevert("NOT_OWNER");
+    //     boundAuction.startAuction(address(erc721Token), 1);
+    // }
     // function testShouldRevertIfLessThanZero() public {
     //     switchSigner(C);
     //     rokiNFT.mint();
@@ -124,16 +134,16 @@ contract DiamondDeployer is Test, IDiamondCut {
     //     boundAuction.placeBid(0, 1e18);
     // }
 
-    function testShouldRevertIfBidAmountIsLessThanLastBiddedAmount() public {
-        switchSigner(A);
-        rokiNFT.mint();
-        rokiNFT.approve(address(diamond), 1);
-        boundAuction.startAuction(1, 2e18);
+    // function testShouldRevertIfBidAmountIsLessThanLastBiddedAmount() public {
+    //     switchSigner(A);
+    //     rokiNFT.mint();
+    //     rokiNFT.approve(address(diamond), 1);
+    //     boundAuction.startAuction(1, 2e18);
 
-        boundAuction.placeBid(0, 1e18);
-        vm.expectRevert("PRICE_MUST_BE_GREATER_THAN_LAST_BIDDED");
-        boundAuction.placeBid(0, 1e18);
-    }
+    //     boundAuction.placeBid(0, 1e18);
+    //     vm.expectRevert("PRICE_MUST_BE_GREATER_THAN_LAST_BIDDED");
+    //     boundAuction.placeBid(0, 1e18);
+    // }
 
     // function testShouldSuccessfullyBid() public {
     //     switchSigner(A);

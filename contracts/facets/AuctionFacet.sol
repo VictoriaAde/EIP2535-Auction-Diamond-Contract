@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {LibDiamond} from "../libraries/LibDiamond.sol";
 import {LibAppStorage} from "../libraries/LibAppStorage.sol";
 import {IERC721} from "../interfaces/IERC721.sol";
 import {IIERC165} from "../interfaces/IERC165.sol";
@@ -24,6 +23,8 @@ contract AuctionFacet {
         uint256 _nftId,
         address _nftAddress
     ) public {
+        require(_nftAddress != address(0), "No zero address call");
+
         // Check if the NFT contract supports ERC721 interface
         if (
             IIERC165(_nftAddress).supportsInterface(type(IERC721).interfaceId)
