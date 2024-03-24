@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.0;
 
-import {IERC165} from "./IERC165.sol";
+// import {IERC165} from "./IERC165.sol";
 
-interface IERC721 is IERC165 {
+interface IERC721 {
     event Transfer(
         address indexed from,
         address indexed to,
