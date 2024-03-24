@@ -5,8 +5,12 @@ import "../contracts/interfaces/IDiamondCut.sol";
 import "../contracts/facets/DiamondCutFacet.sol";
 import "../contracts/facets/DiamondLoupeFacet.sol";
 import "../contracts/facets/OwnershipFacet.sol";
-// import "forge-std/Test.sol";
 import "../contracts/Diamond.sol";
+
+import "forge-std/Test.sol";
+import "../contracts/facets/AUC20Facet.sol";
+import "../contracts/facets/AuctionFacet.sol";
+import "../contracts/RokiMarsNFT.sol";
 
 contract DiamondDeployer is Test, IDiamondCut {
     //contract types of facets to be deployed
@@ -16,20 +20,32 @@ contract DiamondDeployer is Test, IDiamondCut {
     OwnershipFacet ownerF;
     AUC20Facet auctoken;
     AuctionFacet aucFacet;
+    RokiMarsNFT rokiNFT;
 
-    function testDeployDiamond() public {
+    function setUp() public {
         //deploy facets
         dCutFacet = new DiamondCutFacet();
         diamond = new Diamond(address(this), address(dCutFacet));
         dLoupe = new DiamondLoupeFacet();
         ownerF = new OwnershipFacet();
-        auctoken = new AUC20Facet;
-        aucFacet = new AuctionFacet;
+        auctoken = new AUC20Facet();
+        aucFacet = new AuctionFacet();
 
         //upgrade diamond with facets
 
         //build cut struct
         FacetCut[] memory cut = new FacetCut[](4);
+
+        A = mkaddr("staker a");
+        B = mkaddr("staker b");
+        C = mkaddr("staker c");
+
+        //mint test tokens
+        AUC20Facet(address(diamond)).mintTo(A);
+        AUC20Facet(address(diamond)).mintTo(B);
+
+        boundAuction = AuctionFacet(address(diamond));
+        boundERC = AUC20Facet(address(diamond));
 
         cut[0] = (
             FacetCut({
@@ -68,6 +84,19 @@ contract DiamondDeployer is Test, IDiamondCut {
 
         //call a function
         DiamondLoupeFacet(address(diamond)).facetAddresses();
+    }
+
+    function shouldRevertIfTokenAddressIsZero() public {
+        vm.expectRevert("INVALID_CONTRACT_ADDRESS");
+        boundAuction.createAuction(address(0), 1, 1e18, 2 days);
+    }
+
+    function shouldRevertIfNotTokenOwner() public {
+        switchSigner(A);
+        erc721Token.mint();
+        switchSigner(B);
+        vm.expectRevert("NOT_OWNER");
+        boundAuction.createAuction(address(erc721Token), 1, 1e18, 2 days);
     }
 
     function generateSelectors(

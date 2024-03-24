@@ -14,13 +14,14 @@ contract AuctionFacet {
     function startAuction(bytes32 _nftId, uint256 _startingBid) public {
         uint256 _auctionId = l.nextAuctionId + 1;
 
-        l.auctions[_auctionId] = LibAppStorage.Auction(
-            msg.sender,
-            _nftId,
-            _startingBid,
-            false,
-            address(0)
-        );
+        LibAppStorage.Auction storage s = l.auctions[_auctionId];
+
+        s.owner = msg.sender;
+        s.nftId = _nftId;
+        s.randomDAOAddress = address(0);
+        s.settled = false;
+        s.highestBid = _startingBid;
+        s.lastInteractionAddress = msg.sender;
 
         l.nextAuctionId++;
 
@@ -44,7 +45,7 @@ contract AuctionFacet {
         require(msg.sender != address(0));
         uint256 balance = l.balances[msg.sender];
         require(balance >= _amount, "NotEnough");
-        l._transferFrom(msg.sender, address(this), _amount);
+        LibAppStorage._transferFrom(msg.sender, address(this), _amount);
 
         // Update the highest bid and bidder
         l.auctions[_auctionId].highestBid = _amount;
@@ -68,20 +69,27 @@ contract AuctionFacet {
         uint256 teamAmount = (totalFee * 2) / 100; // 2% of totalFee
         uint256 lastInteractionAmount = (totalFee * 1) / 100; // 1% of totalFee
 
+        // LibAppStorage.Bid storage s = l.bids[_auctionId];
+
         // Send to random DAO address
         address randomDAOAddress = generateRandomAddress();
-        LibAppStorage._transferFrom(randomDAOAddress, daoAmount);
+        LibAppStorage._transferFrom(address(this), randomDAOAddress, daoAmount);
 
         // Refund outbid bidder
-        LibAppStorage._transferFrom(l.auctions[_auctionId].owner, outbidAmount);
+        LibAppStorage._transferFrom(
+            address(this),
+            l.auctions[_auctionId].owner,
+            outbidAmount
+        );
 
-        // Send to team wallet
-        LibAppStorage._transferFrom(l.teamWallet, teamAmount);
+        // Send to team ,
+        LibAppStorage._transferFrom(address(this), l.teamWallet, teamAmount);
+        LibAppStorage._burn(msg.sender, burnAmount);
 
         // Send to last interaction address
         // This requires finding the last interaction address and transferring the last interaction amount
-
         LibAppStorage._transferFrom(
+            address(this),
             l.auctions[_auctionId].lastInteractionAddress = msg.sender,
             lastInteractionAmount
         );
@@ -101,6 +109,16 @@ contract AuctionFacet {
         return (l.auctions[auctionId].highestBid * 10) / 100; // 10% of the highest bid
     }
 
+    function getBid(uint256 _auctionId) public view returns (uint256) {
+        return l.auctions[_auctionId].highestBid;
+    }
+
+    function getAuction(
+        uint256 _auctionId
+    ) public view returns (LibAppStorage.Auction memory) {
+        return l.auctions[_auctionId];
+    }
+
     // Additional functions for generating random addresses, finding the last interaction address, etc.
 
     function generateRandomAddress() public returns (address) {
@@ -111,17 +129,23 @@ contract AuctionFacet {
         return address(uint160(uint256(randomHash)));
     }
 
-    function isERC721(address nftContract) public view returns (bool) {
-        // ERC721 interface ID
-        LibAppStorage.erc721Interface = 0x80ac58cd;
-        return IERC721(nftContract).supportsInterface(erc721Interface);
-    }
+    // function isERC721(address nftContract) public view returns (bool) {
+    //     // ERC721 interface ID
+    //     // LibAppStorage.erc721Interface = 0x80ac58cd;
+    //     return
+    //         isERC721(nftContract).supportsInterface(
+    //             LibAppStorage.erc721Interface
+    //         );
+    // }
 
-    function isERC1155(address nftContract) public view returns (bool) {
-        // ERC1155 interface ID
-        LibAppStorage.erc1155Interface = 0xd9b67a26;
-        return IERC1155(nftContract).supportsInterface(erc1155Interface);
-    }
+    // function isERC1155(address nftContract) public view returns (bool) {
+    //     // ERC1155 interface ID
+    //     LibAppStorage.erc1155Interface = 0xd9b67a26;
+    //     return
+    //         isERC721(nftContract).supportsInterface(
+    //             LibAppStorage.erc1155Interface
+    //         );
+    // }
 }
 // function settleAuction(uint256 auctionId) public {
 //     require(

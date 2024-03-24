@@ -8,8 +8,8 @@ library LibAppStorage {
         uint256 amount;
     }
 
-    bytes4 constant ERC721 = 0x73ad2146;
-    bytes4 constant ERC1155 = 0x973bb640;
+    bytes4 constant erc721Interface = 0x73ad2146;
+    bytes4 constant erc1155Interface = 0x973bb640;
 
     struct Auction {
         address owner;
@@ -18,6 +18,12 @@ library LibAppStorage {
         bool settled;
         address randomDAOAddress;
         address lastInteractionAddress;
+    }
+
+    struct Bid {
+        address bidder;
+        uint amount;
+        uint auctionId;
     }
 
     struct Layout {
@@ -35,8 +41,10 @@ library LibAppStorage {
         address[] bidders;
         uint256 lastBidTime;
         mapping(uint256 => Auction) auctions;
+        mapping(uint256 => Bid) bids;
         uint256 nextAuctionId;
         uint256 randNonce;
+        address teamWallet;
     }
 
     function layoutStorage() internal pure returns (Layout storage l) {
