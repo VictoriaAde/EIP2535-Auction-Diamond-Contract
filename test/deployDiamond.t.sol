@@ -99,6 +99,50 @@ contract DiamondDeployer is Test, IDiamondCut {
         boundAuction.createAuction(address(erc721Token), 1, 1e18, 2 days);
     }
 
+    function shouldRevertIfInsufficientTokenBalance() public {
+        switchSigner(C);
+        erc721Token.mint();
+        erc721Token.approve(address(diamond), 1);
+        boundAuction.createAuction(address(erc721Token), 1, 1e18, 2 days);
+        vm.expectRevert("INSUFFICIENT_BALANCE");
+        boundAuction.bid(0, 5e18);
+    }
+
+    function shouldRevertIfBidAmountIsLessThanAuctionStartPrice() public {
+        switchSigner(A);
+        erc721Token.mint();
+        erc721Token.approve(address(diamond), 1);
+        boundAuction.createAuction(address(erc721Token), 1, 2e18, 2 days);
+        vm.expectRevert("STARTING_PRICE_MUST_BE_GREATER");
+        boundAuction.bid(0, 1e18);
+    }
+
+    function shouldRevertIfBidAmountIsLessThanLastBiddedAmount() public {
+        switchSigner(A);
+        erc721Token.mint();
+        erc721Token.approve(address(diamond), 1);
+        boundAuction.createAuction(address(erc721Token), 1, 2e18, 2 days);
+        boundAuction.bid(0, 2e18);
+        vm.expectRevert("PRICE_MUST_BE_GREATER_THAN_LAST_BIDDED");
+        boundAuction.bid(0, 1e18);
+    }
+
+    function testBids() public {
+        switchSigner(A);
+        erc721Token.mint();
+        erc721Token.approve(address(diamond), 1);
+        boundAuction.startAuction(1, 2e18);
+        boundAuction.placeBid(0, 2e18);
+        switchSigner(B);
+        boundAuction.bid(0, 3e18);
+        LibAppStorage.Bid[] memory bids = boundAuction.getBid(0);
+        assertEq(bids.length, 2);
+        assertEq(bids[0].author, A);
+        assertEq(bids[0].amount, 2e18);
+        assertEq(bids[1].author, B);
+        assertEq(bids[1].amount, (3e18 - ((10 * 3e18) / 100)));
+    }
+
     function generateSelectors(
         string memory _facetName
     ) internal returns (bytes4[] memory selectors) {
