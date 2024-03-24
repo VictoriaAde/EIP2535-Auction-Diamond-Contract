@@ -12,6 +12,8 @@ contract AuctionFacet {
     event AuctionSettled(uint256 auctionId, address winner, uint256 finalPrice);
 
     function startAuction(uint256 _nftId, uint256 _startingBid) public {
+        require(msg.sender != address(0), "ZERO_ADDRESS");
+
         uint256 _auctionId = l.nextAuctionId + 1;
 
         LibAppStorage.Auction storage s = l.auctions[_auctionId];

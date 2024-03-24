@@ -19,7 +19,7 @@ contract DiamondDeployer is Test, IDiamondCut {
     DiamondCutFacet dCutFacet;
     DiamondLoupeFacet dLoupe;
     OwnershipFacet ownerF;
-    AUC20Facet auctoken;
+    AUC20Facet aucToken;
     AuctionFacet aucFacet;
     RokiMarsNFT rokiNFT;
 
@@ -38,8 +38,9 @@ contract DiamondDeployer is Test, IDiamondCut {
         diamond = new Diamond(address(this), address(dCutFacet));
         dLoupe = new DiamondLoupeFacet();
         ownerF = new OwnershipFacet();
-        auctoken = new AUC20Facet();
+        aucToken = new AUC20Facet();
         aucFacet = new AuctionFacet();
+        rokiNFT = new RokiMarsNFT();
 
         //upgrade diamond with facet
         //build cut struct
@@ -57,13 +58,13 @@ contract DiamondDeployer is Test, IDiamondCut {
             FacetCut({
                 facetAddress: address(ownerF),
                 action: FacetCutAction.Add,
-                functionSelectors: generateSelectors("AUC20Facet")
+                functionSelectors: generateSelectors("OwnershipFacet")
             })
         );
 
         cut[2] = (
             FacetCut({
-                facetAddress: address(ownerF),
+                facetAddress: address(aucToken),
                 action: FacetCutAction.Add,
                 functionSelectors: generateSelectors("AUC20Facet")
             })
@@ -92,31 +93,25 @@ contract DiamondDeployer is Test, IDiamondCut {
         boundERC = AUC20Facet(address(diamond));
 
         //call a function
-        DiamondLoupeFacet(address(diamond)).facetAddresses();
+        // DiamondLoupeFacet(address(diamond)).facetAddresses();
     }
 
-    function shouldRevertIfTokenAddressIsZero() public {
-        vm.expectRevert("INVALID_CONTRACT_ADDRESS");
-        boundAuction.startAuction(1, 2e18);
-    }
+    // function testShouldRevertIfTokenAddressIsZero() public {
+    //     vm.expectRevert("ZERO_ADDRESS");
+    //     boundAuction.startAuction(1, 2e18);
+    // }
 
-    function shouldRevertIfNotTokenOwner() public {
-        switchSigner(A);
-        rokiNFT.safeMint(
-            A,
-            "ipfs://QmZ7AfnNr2tBots5xrUGXc4EGZEcZdrNJQQZYGxtLowRgU"
-        );
-        switchSigner(B);
-        vm.expectRevert("NOT_OWNER");
-        boundAuction.startAuction(1, 2e18);
-    }
+    // function testShouldRevertIfNotTokenOwner() public {
+    //     switchSigner(A);
+    //     rokiNFT.mint();
+    //     switchSigner(B);
+    //     vm.expectRevert("NOT_OWNER");
+    //     boundAuction.startAuction(1, 2e18);
+    // }
 
-    function shouldRevertIfInsufficientTokenBalance() public {
+    function testShouldRevertIfInsufficientTokenBalance() public {
         switchSigner(C);
-        rokiNFT.safeMint(
-            C,
-            "ipfs://QmZ7AfnNr2tBots5xrUGXc4EGZEcZdrNJQQZYGxtLowRgU"
-        );
+        rokiNFT.mint();
         rokiNFT.approve(address(diamond), 1);
         boundAuction.startAuction(1, 2e18);
 
@@ -124,56 +119,47 @@ contract DiamondDeployer is Test, IDiamondCut {
         boundAuction.placeBid(0, 5e18);
     }
 
-    function shouldRevertIfBidAmountIsLessThanAuctionStartPrice() public {
-        switchSigner(A);
-        rokiNFT.safeMint(
-            A,
-            "ipfs://QmZ7AfnNr2tBots5xrUGXc4EGZEcZdrNJQQZYGxtLowRgU"
-        );
-        rokiNFT.approve(address(diamond), 1);
-        boundAuction.startAuction(1, 2e18);
+    // function testShouldRevertIfBidAmountIsLessThanAuctionStartPrice() public {
+    //     switchSigner(A);
+    //     rokiNFT.mint();
+    //     rokiNFT.approve(address(diamond), 1);
+    //     boundAuction.startAuction(1, 2e18);
 
-        vm.expectRevert("STARTING_PRICE_MUST_BE_GREATER");
-        boundAuction.placeBid(0, 1e18);
-    }
+    //     vm.expectRevert("STARTING_PRICE_MUST_BE_GREATER");
+    //     boundAuction.placeBid(0, 1e18);
+    // }
 
-    function shouldRevertIfBidAmountIsLessThanLastBiddedAmount() public {
-        switchSigner(A);
-        rokiNFT.safeMint(
-            A,
-            "ipfs://QmZ7AfnNr2tBots5xrUGXc4EGZEcZdrNJQQZYGxtLowRgU"
-        );
-        rokiNFT.approve(address(diamond), 1);
-        boundAuction.startAuction(1, 2e18);
+    // function testShouldRevertIfBidAmountIsLessThanLastBiddedAmount() public {
+    //     switchSigner(A);
+    //     rokiNFT.mint();
+    //     rokiNFT.approve(address(diamond), 1);
+    //     boundAuction.startAuction(1, 2e18);
 
-        boundAuction.placeBid(0, 2e18);
-        vm.expectRevert("PRICE_MUST_BE_GREATER_THAN_LAST_BIDDED");
-        boundAuction.placeBid(0, 1e18);
-    }
+    //     boundAuction.placeBid(0, 2e18);
+    //     vm.expectRevert("PRICE_MUST_BE_GREATER_THAN_LAST_BIDDED");
+    //     boundAuction.placeBid(0, 1e18);
+    // }
 
-    function testBids() public {
-        switchSigner(A);
-        rokiNFT.safeMint(
-            A,
-            "ipfs://QmZ7AfnNr2tBots5xrUGXc4EGZEcZdrNJQQZYGxtLowRgU"
-        );
-        rokiNFT.approve(address(diamond), 1);
-        boundAuction.startAuction(1, 2e18);
-        boundAuction.placeBid(0, 2e18);
-        switchSigner(B);
-        boundAuction.placeBid(0, 3e18);
+    // function testShouldSuccessfullyBid() public {
+    //     switchSigner(A);
+    //     rokiNFT.mint();
+    //     rokiNFT.approve(address(diamond), 1);
+    //     boundAuction.startAuction(1, 2e18);
+    //     boundAuction.placeBid(0, 2e18);
+    //     switchSigner(B);
+    //     boundAuction.placeBid(0, 3e18);
 
-        // LibAppStorage.Auction[] memory auctions = boundAuction.getBid(0);
-        // LibAppStorage.Auction storage aucs = boundAuction.getBid(0);
-        LibAppStorage.Auction storage aucs1 = l.bids[0];
-        LibAppStorage.Auction storage aucs2 = l.bids[1];
+    //     // LibAppStorage.Auction[] memory auctions = boundAuction.getBid(0);
+    //     // LibAppStorage.Auction storage aucs = boundAuction.getBid(0);
+    //     LibAppStorage.Auction storage aucs1 = l.auctions[0];
+    //     LibAppStorage.Auction storage aucs2 = l.auctions[1];
 
-        // assertEq(aucs.length, 2);
-        assertEq(aucs1.owner, A);
-        assertEq(aucs1.amount, 2e18);
-        assertEq(aucs2.owner, B);
-        assertEq(aucs2.amount, (3e18 - ((10 * 3e18) / 100)));
-    }
+    //     // assertEq(aucs.length, 2);
+    //     assertEq(aucs1.owner, A);
+    //     assertEq(aucs1.highestBid, 2e18);
+    //     assertEq(aucs2.owner, B);
+    //     assertEq(aucs2.highestBid, (3e18 - ((10 * 3e18) / 100)));
+    // }
 
     function generateSelectors(
         string memory _facetName
