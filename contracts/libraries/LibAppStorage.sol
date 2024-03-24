@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 library LibAppStorage {
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
+
     struct UserBid {
         uint256 amount;
     }
@@ -57,5 +58,19 @@ library LibAppStorage {
         l.balances[_from] = frombalances - _amount;
         l.balances[_to] += _amount;
         emit Transfer(_from, _to, _amount);
+    }
+
+    function _burn(address account, uint256 amount) internal {
+        Layout storage l = layoutStorage();
+
+        require(account != address(0), "ERC20: burn from the zero address");
+        uint256 accountBalance = l.balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+
+        unchecked {
+            l.balances[account] = accountBalance - amount;
+            l.totalSupply -= amount;
+        }
+        emit Transfer(account, address(0), amount);
     }
 }
