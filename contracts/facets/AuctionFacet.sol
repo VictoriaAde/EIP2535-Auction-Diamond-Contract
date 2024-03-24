@@ -12,7 +12,7 @@ contract AuctionFacet {
     event AuctionSettled(uint256 auctionId, address winner, uint256 finalPrice);
 
     function startAuction(uint256 _nftId, uint256 _startingBid) public {
-        require(msg.sender != address(0), "ZERO_ADDRESS");
+        require(_startingBid > 0, "Starting bid must be greater than zero");
 
         uint256 _auctionId = l.nextAuctionId + 1;
 
@@ -37,12 +37,11 @@ contract AuctionFacet {
         );
         require(
             _amount > l.auctions[_auctionId].highestBid,
-            "Bid must be higher than the current highest bid"
+            "PRICE_MUST_BE_GREATER_THAN_LAST_BIDDED"
         );
 
         // Transfer AUC tokens from the bidder to the contract
         // This requires an approval and transferFrom call from the ERC20Facet
-
         require(_amount > 0, "NotZero");
         require(msg.sender != address(0));
         uint256 balance = l.balances[msg.sender];
@@ -70,8 +69,6 @@ contract AuctionFacet {
         uint256 outbidAmount = (totalFee * 3) / 100; // 3% of totalFee
         uint256 teamAmount = (totalFee * 2) / 100; // 2% of totalFee
         uint256 lastInteractionAmount = (totalFee * 1) / 100; // 1% of totalFee
-
-        // LibAppStorage.Bid storage s = l.bids[_auctionId];
 
         // Send to random DAO address
         address randomDAOAddress = generateRandomAddress();
@@ -130,65 +127,7 @@ contract AuctionFacet {
         );
         return address(uint160(uint256(randomHash)));
     }
-
-    // function isERC721(address nftContract) public view returns (bool) {
-    //     // ERC721 interface ID
-    //     // LibAppStorage.erc721Interface = 0x80ac58cd;
-    //     return
-    //         isERC721(nftContract).supportsInterface(
-    //             LibAppStorage.erc721Interface
-    //         );
-    // }
-
-    // function isERC1155(address nftContract) public view returns (bool) {
-    //     // ERC1155 interface ID
-    //     LibAppStorage.erc1155Interface = 0xd9b67a26;
-    //     return
-    //         isERC721(nftContract).supportsInterface(
-    //             LibAppStorage.erc1155Interface
-    //         );
-    // }
 }
-// function settleAuction(uint256 auctionId) public {
-//     require(
-//         !l.auctions[auctionId].settled,
-//         "Auction has already been settled"
-//     );
-
-//     l.auctions[auctionId].settled = true;
-//     uint256 totalFee = calculateFee(auctionId);
-//     uint256 burnAmount = (totalFee * 2) / 100; // 2% of totalFee
-//     uint256 daoAmount = (totalFee * 2) / 100; // 2% of totalFee
-//     uint256 outbidAmount = (totalFee * 3) / 100; // 3% of totalFee
-//     uint256 teamAmount = (totalFee * 2) / 100; // 2% of totalFee
-//     uint256 lastInteractionAmount = (totalFee * 1) / 100; // 1% of totalFee
-
-//     // Burn tokens
-//     // This requires a burn function in the ERC20Facet
-//     // Example: ERC20Facet.burn(burnAmount);
-
-//     // Send to random DAO address
-//     // This requires generating a random address and transferring the amount
-//     // Example: payable(randomDAOAddress).transfer(daoAmount);
-
-//     // Refund outbid bidder
-//     // This requires transferring the outbid amount back to the outbid bidder
-//     // Example: payable(auctions[auctionId].owner).transfer(outbidAmount);
-
-//     // Send to team wallet
-//     // This requires transferring the team amount to the team wallet
-//     // Example: payable(teamWallet).transfer(teamAmount);
-
-//     // Send to last interaction address
-//     // This requires finding the last interaction address and transferring the last interaction amount
-//     // Example: payable(lastInteractionAddress).transfer(lastInteractionAmount);
-
-//     emit AuctionSettled(
-//         auctionId,
-//         l.auctions[auctionId].owner,
-//         l.auctions[auctionId].highestBid
-//     );
-// }
 
 //     A diamond that acts as an auction house, auction are zero-loss meaning all participants gain something once they are outbid
 

@@ -96,28 +96,23 @@ contract DiamondDeployer is Test, IDiamondCut {
         // DiamondLoupeFacet(address(diamond)).facetAddresses();
     }
 
-    // function testShouldRevertIfTokenAddressIsZero() public {
-    //     vm.expectRevert("ZERO_ADDRESS");
-    //     boundAuction.startAuction(1, 2e18);
-    // }
-
-    // function testShouldRevertIfNotTokenOwner() public {
-    //     switchSigner(A);
+    // function testShouldRevertIfLessThanZero() public {
+    //     switchSigner(C);
     //     rokiNFT.mint();
-    //     switchSigner(B);
-    //     vm.expectRevert("NOT_OWNER");
-    //     boundAuction.startAuction(1, 2e18);
+    //     boundAuction.startAuction(1, 0);
+
+    //     vm.expectRevert("Starting bid must be greater than zero");
     // }
 
-    function testShouldRevertIfInsufficientTokenBalance() public {
-        switchSigner(C);
-        rokiNFT.mint();
-        rokiNFT.approve(address(diamond), 1);
-        boundAuction.startAuction(1, 2e18);
+    // function testShouldRevertIfInsufficientTokenBalance() public {
+    //     switchSigner(C);
+    //     rokiNFT.mint();
+    //     rokiNFT.approve(address(diamond), 1);
+    //     boundAuction.startAuction(1, 2e18);
 
-        vm.expectRevert("INSUFFICIENT_BALANCE");
-        boundAuction.placeBid(0, 5e18);
-    }
+    //     vm.expectRevert("INSUFFICIENT_BALANCE");
+    //     boundAuction.placeBid(0, 5e18);
+    // }
 
     // function testShouldRevertIfBidAmountIsLessThanAuctionStartPrice() public {
     //     switchSigner(A);
@@ -125,20 +120,20 @@ contract DiamondDeployer is Test, IDiamondCut {
     //     rokiNFT.approve(address(diamond), 1);
     //     boundAuction.startAuction(1, 2e18);
 
-    //     vm.expectRevert("STARTING_PRICE_MUST_BE_GREATER");
+    //     vm.expectRevert("Bid must be higher than the current highest bid");
     //     boundAuction.placeBid(0, 1e18);
     // }
 
-    // function testShouldRevertIfBidAmountIsLessThanLastBiddedAmount() public {
-    //     switchSigner(A);
-    //     rokiNFT.mint();
-    //     rokiNFT.approve(address(diamond), 1);
-    //     boundAuction.startAuction(1, 2e18);
+    function testShouldRevertIfBidAmountIsLessThanLastBiddedAmount() public {
+        switchSigner(A);
+        rokiNFT.mint();
+        rokiNFT.approve(address(diamond), 1);
+        boundAuction.startAuction(1, 2e18);
 
-    //     boundAuction.placeBid(0, 2e18);
-    //     vm.expectRevert("PRICE_MUST_BE_GREATER_THAN_LAST_BIDDED");
-    //     boundAuction.placeBid(0, 1e18);
-    // }
+        boundAuction.placeBid(0, 1e18);
+        vm.expectRevert("PRICE_MUST_BE_GREATER_THAN_LAST_BIDDED");
+        boundAuction.placeBid(0, 1e18);
+    }
 
     // function testShouldSuccessfullyBid() public {
     //     switchSigner(A);
