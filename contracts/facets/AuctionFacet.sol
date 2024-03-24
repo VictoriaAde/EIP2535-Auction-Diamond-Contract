@@ -3,133 +3,198 @@ pragma solidity ^0.8.0;
 
 import {LibDiamond} from "../libraries/LibDiamond.sol";
 import {LibAppStorage} from "../libraries/LibAppStorage.sol";
+import {IERC721} from "../interfaces/IERC721.sol";
+import {IIERC165} from "../interfaces/IERC165.sol";
+import {IERC1155} from "../interfaces/IERC1155.sol";
 
 contract AuctionFacet {
     LibAppStorage.Layout internal l;
 
-    event AuctionStarted(uint256 auctionId, uint256 nftId, uint256 startingBid);
-    event BidPlaced(uint256 auctionId, address bidder, uint256 amount);
-    event AuctionSettled(uint256 auctionId, address winner, uint256 finalPrice);
+    function createAuction(
+        uint256 _duration,
+        uint256 _startingBid,
+        uint256 _nftId,
+        address _nftAddress
+    ) public {
+        if (
+            IIERC165(_nftAddress).supportsInterface(type(IERC721).interfaceId)
+        ) {
+            require(
+                IERC721(_nftAddress).ownerOf(_nftId) == msg.sender,
+                "AuctionFacet: Not owner of NFT"
+            );
+        } else if (
+            IIERC165(_nftAddress).supportsInterface(type(IERC1155).interfaceId)
+        ) {
+            require(
+                IERC1155(_nftAddress).balanceOf(msg.sender, _nftId) > 0,
+                "AuctionFacet: Not owner of NFT"
+            );
+        } else {
+            revert("AuctionFacet: Invalid NFT contract");
+        }
+        uint256 auctionId = l.auctionCount + 1;
+        //    AuctionDetails
+        LibAppStorage.AuctionDetails storage a = l.Auctions[auctionId];
+        a.duration = _duration;
+        a.startingBid = _startingBid;
+        a.nftId = _nftId;
+        a.nftAddress = _nftAddress;
 
-    function startAuction(uint256 _nftId, uint256 _startingBid) public {
-        require(_startingBid > 0, "Starting bid must be greater than zero");
-
-        uint256 _auctionId = l.nextAuctionId + 1;
-
-        LibAppStorage.Auction storage s = l.auctions[_auctionId];
-
-        s.owner = msg.sender;
-        s.nftId = _nftId;
-        s.randomDAOAddress = address(0);
-        s.settled = false;
-        s.highestBid = _startingBid;
-        s.lastInteractionAddress = msg.sender;
-
-        l.nextAuctionId++;
-
-        emit AuctionStarted(_auctionId, _nftId, _startingBid);
+        l.auctionCount = l.auctionCount + 1;
     }
 
-    function placeBid(uint256 _auctionId, uint256 _amount) public {
+    function placeBid(uint256 _amount, uint256 _auctionId) public {
+        LibAppStorage.AuctionDetails storage a = l.Auctions[_auctionId];
         require(
-            !l.auctions[_auctionId].settled,
-            "Auction has already been settled"
+            a.highestBidder != msg.sender,
+            "AuctionFacet: Already highest bidder"
         );
         require(
-            _amount > l.auctions[_auctionId].highestBid,
-            "PRICE_MUST_BE_GREATER_THAN_LAST_BIDDED"
+            a.startingBid <= _amount,
+            "AuctionFacet: Bid amount is less than starting bid"
+        );
+        require(
+            a.duration > block.timestamp,
+            "AuctionFacet: Auction has ended"
         );
 
-        // Transfer AUC tokens from the bidder to the contract
-        // This requires an approval and transferFrom call from the ERC20Facet
-        require(_amount > 0, "NotZero");
-        require(msg.sender != address(0));
-        uint256 balance = l.balances[msg.sender];
-        require(balance >= _amount, "NotEnough");
-        LibAppStorage._transferFrom(msg.sender, address(this), _amount);
+        uint balance = l.balances[msg.sender];
+        require(balance >= _amount, "AuctionFacet: Not enough balance to bid");
+        // LibAppStorage._transferFrom(msg.sender, address(this), _amount);
 
-        // Update the highest bid and bidder
-        l.auctions[_auctionId].highestBid = _amount;
-        l.auctions[_auctionId].owner = msg.sender;
-        l.auctions[_auctionId].lastInteractionAddress = msg.sender;
+        if (a.currentBid == 0) {
+            LibAppStorage._transferFrom(msg.sender, address(this), _amount);
+            a.highestBidder = msg.sender;
+            a.currentBid = _amount;
+        } else {
+            uint check = ((a.currentBid * 20) / 100) + a.currentBid;
+            if (_amount < check) {
+                revert("Unprofitable Bid");
+            }
+            LibAppStorage._transferFrom(msg.sender, address(this), _amount);
+            //_payPreviousBidder
+            _payPreviousBidder(_auctionId, _amount, a.currentBid);
 
-        emit BidPlaced(_auctionId, msg.sender, _amount);
+            a.previousBidder = a.highestBidder;
+            a.highestBidder = msg.sender;
+            a.currentBid = _amount;
+
+            _handleTransactionCosts(_auctionId, _amount);
+            payLastInteractor(_auctionId, a.highestBidder);
+        }
     }
 
-    function settleAuction(uint256 _auctionId) public {
+    function claimReward(uint256 _auctionId) public {
+        LibAppStorage.AuctionDetails storage a = l.Auctions[_auctionId];
         require(
-            !l.auctions[_auctionId].settled,
-            "Auction has already been settled"
+            a.highestBidder == msg.sender,
+            "AuctionFacet: Only highest bidder can claim reward"
+        );
+        require(
+            a.duration <= block.timestamp,
+            "AuctionFacet: Auction duration has not ended"
         );
 
-        l.auctions[_auctionId].settled = true;
-        uint256 totalFee = calculateFee(_auctionId);
-        uint256 burnAmount = (totalFee * 2) / 100; // 2% of totalFee
-        uint256 daoAmount = (totalFee * 2) / 100; // 2% of totalFee
-        uint256 outbidAmount = (totalFee * 3) / 100; // 3% of totalFee
-        uint256 teamAmount = (totalFee * 2) / 100; // 2% of totalFee
-        uint256 lastInteractionAmount = (totalFee * 1) / 100; // 1% of totalFee
+        // Check if the bidded NFT is ERC1155 or ERC721
+        if (
+            IIERC165(a.nftAddress).supportsInterface(type(IERC1155).interfaceId)
+        ) {
+            // Transfer ERC1155 token to the winner
+            IERC1155(a.nftAddress).safeTransferFrom(
+                address(this),
+                msg.sender,
+                a.nftId,
+                1,
+                ""
+            );
+        } else if (
+            IIERC165(a.nftAddress).supportsInterface(type(IERC721).interfaceId)
+        ) {
+            // Transfer ERC721 token to the winner
+            IERC721(a.nftAddress).safeTransferFrom(
+                address(this),
+                msg.sender,
+                a.nftId
+            );
+        } else {
+            revert("AuctionFacet: Invalid NFT type");
+        }
+        // Reset auction details
+        a.highestBidder = address(0);
+        a.currentBid = 0;
+        a.previousBidder = address(0);
+        a.duration = 0;
+        a.startingBid = 0;
+        a.nftId = 0;
+        a.nftAddress = address(0);
+    }
 
-        // Send to random DAO address
-        address randomDAOAddress = generateRandomAddress();
-        LibAppStorage._transferFrom(address(this), randomDAOAddress, daoAmount);
+    function _payPreviousBidder(
+        uint256 _auctionId,
+        uint256 _amount,
+        uint256 _previousBid
+    ) private {
+        LibAppStorage.AuctionDetails storage a = l.Auctions[_auctionId];
+        require(
+            a.previousBidder != address(0),
+            "AuctionFacet: No previous bidder"
+        );
 
-        // Refund outbid bidder
+        uint256 paymentAmount = ((_amount * LibAppStorage.PreviousBidder) /
+            100) + _previousBid;
         LibAppStorage._transferFrom(
             address(this),
-            l.auctions[_auctionId].owner,
-            outbidAmount
+            a.previousBidder,
+            paymentAmount
         );
+    }
 
-        // Send to team ,
-        LibAppStorage._transferFrom(address(this), l.teamWallet, teamAmount);
-        LibAppStorage._burn(msg.sender, burnAmount);
+    function _handleTransactionCosts(
+        uint256 _auctionId,
+        uint256 _amount
+    ) private {
+        LibAppStorage.AuctionDetails storage a = l.Auctions[_auctionId];
+        // Handle Burn
+        uint256 burnAmount = (_amount * LibAppStorage.Burnable) / 100;
+        LibAppStorage._burn(a.previousBidder, burnAmount);
 
-        // Send to last interaction address
-        // This requires finding the last interaction address and transferring the last interaction amount
+        // Handle dao fees
+        uint256 daoAmount = (_amount * LibAppStorage.DAO) / 100;
         LibAppStorage._transferFrom(
             address(this),
-            l.auctions[_auctionId].lastInteractionAddress = msg.sender,
-            lastInteractionAmount
+            LibAppStorage.DAOAddress,
+            daoAmount
         );
 
-        emit AuctionSettled(
-            _auctionId,
-            l.auctions[_auctionId].owner,
-            l.auctions[_auctionId].highestBid
+        // Handle team fees
+        uint256 teamAmount = (_amount * LibAppStorage.TeamWallet) / 100;
+        LibAppStorage._transferFrom(
+            address(this),
+            LibAppStorage.TeamWalletAddress,
+            teamAmount
         );
     }
-
-    function burn(uint256 amount) public {
-        LibAppStorage._burn(msg.sender, amount);
-    }
-
-    function calculateFee(uint256 auctionId) private view returns (uint256) {
-        return (l.auctions[auctionId].highestBid * 10) / 100; // 10% of the highest bid
-    }
-
-    function getBid(uint256 _auctionId) public view returns (uint256) {
-        return l.auctions[_auctionId].highestBid;
-    }
-
-    function getAuction(
-        uint256 _auctionId
-    ) public view returns (LibAppStorage.Auction memory) {
-        return l.auctions[_auctionId];
-    }
-
-    // Additional functions for generating random addresses, finding the last interaction address, etc.
-
-    function generateRandomAddress() public returns (address) {
-        l.randNonce++;
-        bytes32 randomHash = keccak256(
-            abi.encodePacked(block.timestamp, msg.sender, l.randNonce)
+    function payLastInteractor(
+        uint256 _auctionId,
+        address _lastInteractor
+    ) private {
+        LibAppStorage.AuctionDetails storage a = l.Auctions[_auctionId];
+        require(
+            _lastInteractor != address(0),
+            "AuctionFacet: No last interactor"
         );
-        return address(uint160(uint256(randomHash)));
+
+        uint256 paymentAmount = (a.currentBid * 1) / 100;
+        LibAppStorage._transferFrom(
+            address(this),
+            _lastInteractor,
+            paymentAmount
+        );
     }
 }
 
-//     A diamond that acts as an auction house, auction are zero-loss meaning all participants gain something once they are outbid
+// A diamond that acts as an auction house, auction are zero-loss meaning all participants gain something once they are outbid
 
 // sample
 
@@ -146,9 +211,12 @@ contract AuctionFacet {
 // the diamond should also be the AUC erc20 tokn contract e.g AUCFacet
 
 // note:
+
 // - make use of libraries
 // - your diamond should support both erc721 and erc1155 and both as a collection
 // - make use of libraries 2
 // -tests...of course
 
-// Auctioneers come to your site, display NFTs, Be able to get ID of anyNFT id, so you can display them for sell
+// bid should have timeline.
+
+// When they bid

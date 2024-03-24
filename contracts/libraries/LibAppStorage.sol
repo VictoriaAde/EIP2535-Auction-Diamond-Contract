@@ -2,30 +2,28 @@
 pragma solidity ^0.8.0;
 
 library LibAppStorage {
+    uint256 constant FeePercentage = 10;
+    uint256 constant Burnable = 2;
+    uint256 constant DAO = 2;
+    uint256 constant TeamWallet = 2;
+    uint256 constant PreviousBidder = 3;
+    uint256 constant Lastinteractor = 1;
+    address constant TeamWalletAddress =
+        0x434018cb6b43a1844bF8C58991745d492Bc99346;
+    address constant DAOAddress = 0x434018cb6b43a1844bF8C58991745d492Bc99346;
+
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
-
-    struct UserBid {
-        uint256 amount;
-    }
-
-    bytes4 constant erc721Interface = 0x73ad2146;
-    bytes4 constant erc1155Interface = 0x973bb640;
-
-    struct Auction {
-        address owner;
+    struct AuctionDetails {
+        address highestBidder;
+        address previousBidder;
+        uint256 duration;
+        uint256 startingBid;
         uint256 nftId;
-        uint256 highestBid;
-        bool settled;
-        address randomDAOAddress;
-        address lastInteractionAddress;
+        uint256 auctionId;
+        address nftAddress;
+        uint256 currentBid;
+        // uint256 startTime;
     }
-
-    struct Bid {
-        address bidder;
-        uint amount;
-        uint auctionId;
-    }
-
     struct Layout {
         //ERC20
         string name;
@@ -34,17 +32,10 @@ library LibAppStorage {
         uint8 decimals;
         mapping(address => uint256) balances;
         mapping(address => mapping(address => uint256)) allowances;
-        //BIDDING
-        address rewardNFT;
-        uint256 rewardRate;
-        mapping(address => UserBid) userDetails;
-        address[] bidders;
-        uint256 lastBidTime;
-        mapping(uint256 => Auction) auctions;
-        mapping(uint256 => Bid) bids;
-        uint256 nextAuctionId;
-        uint256 randNonce;
-        address teamWallet;
+        //Auction
+        address AUCToken;
+        mapping(uint => AuctionDetails) Auctions;
+        uint256 auctionCount;
     }
 
     function layoutStorage() internal pure returns (Layout storage l) {
@@ -69,17 +60,17 @@ library LibAppStorage {
         emit Transfer(_from, _to, _amount);
     }
 
-    function _burn(address account, uint256 amount) internal {
+    function _burn(address addr, uint256 amount) internal {
         Layout storage l = layoutStorage();
 
-        require(account != address(0), "ERC20: burn from the zero address");
-        uint256 accountBalance = l.balances[account];
+        require(addr != address(0), "ERC20: burn from the zero address");
+        uint256 accountBalance = l.balances[addr];
         require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
 
         unchecked {
-            l.balances[account] = accountBalance - amount;
+            l.balances[addr] = accountBalance - amount;
             l.totalSupply -= amount;
         }
-        emit Transfer(account, address(0), amount);
+        emit Transfer(addr, address(0), amount);
     }
 }
