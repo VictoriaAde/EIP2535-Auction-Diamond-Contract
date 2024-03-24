@@ -5,7 +5,7 @@ import "../contracts/interfaces/IDiamondCut.sol";
 import "../contracts/facets/DiamondCutFacet.sol";
 import "../contracts/facets/DiamondLoupeFacet.sol";
 import "../contracts/facets/OwnershipFacet.sol";
-import "forge-std/Test.sol";
+// import "forge-std/Test.sol";
 import "../contracts/Diamond.sol";
 
 contract DiamondDeployer is Test, IDiamondCut {
@@ -14,6 +14,8 @@ contract DiamondDeployer is Test, IDiamondCut {
     DiamondCutFacet dCutFacet;
     DiamondLoupeFacet dLoupe;
     OwnershipFacet ownerF;
+    AUC20Facet auctoken;
+    AuctionFacet aucFacet;
 
     function testDeployDiamond() public {
         //deploy facets
@@ -21,11 +23,13 @@ contract DiamondDeployer is Test, IDiamondCut {
         diamond = new Diamond(address(this), address(dCutFacet));
         dLoupe = new DiamondLoupeFacet();
         ownerF = new OwnershipFacet();
+        auctoken = new AUC20Facet;
+        aucFacet = new AuctionFacet;
 
         //upgrade diamond with facets
 
         //build cut struct
-        FacetCut[] memory cut = new FacetCut[](2);
+        FacetCut[] memory cut = new FacetCut[](4);
 
         cut[0] = (
             FacetCut({
@@ -39,7 +43,23 @@ contract DiamondDeployer is Test, IDiamondCut {
             FacetCut({
                 facetAddress: address(ownerF),
                 action: FacetCutAction.Add,
-                functionSelectors: generateSelectors("OwnershipFacet")
+                functionSelectors: generateSelectors("AUC20Facet")
+            })
+        );
+
+        cut[2] = (
+            FacetCut({
+                facetAddress: address(ownerF),
+                action: FacetCutAction.Add,
+                functionSelectors: generateSelectors("AUC20Facet")
+            })
+        );
+
+        cut[3] = (
+            FacetCut({
+                facetAddress: address(aucFacet),
+                action: FacetCutAction.Add,
+                functionSelectors: generateSelectors("AuctionFacet")
             })
         );
 

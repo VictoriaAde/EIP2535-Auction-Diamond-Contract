@@ -185,3 +185,5 @@ contract AuctionFacet {
 // - your diamond should support both erc721 and erc1155 and both as a collection
 // - make use of libraries 2
 // -tests...of course
+
+// Auctioneers come to your site, display NFTs, Be able to get ID of anyNFT id, so you can display them for sell
