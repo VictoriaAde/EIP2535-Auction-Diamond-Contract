@@ -44,11 +44,6 @@ contract AuctionFacet {
         require(msg.sender != address(0));
         uint256 balance = l.balances[msg.sender];
         require(balance >= _amount, "NotEnough");
-        // IERC20 aucToken = IERC20(l.aucToken);
-        // require(
-        //     aucToken.allowance(msg.sender, address(this)) >= amount,
-        //     "Not enough allowance to transfer"
-        // );
         l._transferFrom(msg.sender, address(this), _amount);
 
         // Update the highest bid and bidder
@@ -59,14 +54,14 @@ contract AuctionFacet {
         emit BidPlaced(_auctionId, msg.sender, _amount);
     }
 
-    function settleAuction(uint256 auctionId) public {
+    function settleAuction(uint256 _auctionId) public {
         require(
-            !l.auctions[auctionId].settled,
+            !l.auctions[_auctionId].settled,
             "Auction has already been settled"
         );
 
-        l.auctions[auctionId].settled = true;
-        uint256 totalFee = calculateFee(auctionId);
+        l.auctions[_auctionId].settled = true;
+        uint256 totalFee = calculateFee(_auctionId);
         uint256 burnAmount = (totalFee * 2) / 100; // 2% of totalFee
         uint256 daoAmount = (totalFee * 2) / 100; // 2% of totalFee
         uint256 outbidAmount = (totalFee * 3) / 100; // 3% of totalFee
@@ -78,7 +73,7 @@ contract AuctionFacet {
         LibAppStorage._transferFrom(randomDAOAddress, daoAmount);
 
         // Refund outbid bidder
-        LibAppStorage._transferFrom(l.auctions[auctionId].owner, outbidAmount);
+        LibAppStorage._transferFrom(l.auctions[_auctionId].owner, outbidAmount);
 
         // Send to team wallet
         LibAppStorage._transferFrom(l.teamWallet, teamAmount);
@@ -87,14 +82,14 @@ contract AuctionFacet {
         // This requires finding the last interaction address and transferring the last interaction amount
 
         LibAppStorage._transferFrom(
-            lastInteractionAddress,
+            l.auctions[_auctionId].lastInteractionAddress = msg.sender,
             lastInteractionAmount
         );
 
         emit AuctionSettled(
-            auctionId,
-            l.auctions[auctionId].owner,
-            l.auctions[auctionId].highestBid
+            _auctionId,
+            l.auctions[_auctionId].owner,
+            l.auctions[_auctionId].highestBid
         );
     }
 
@@ -109,9 +104,9 @@ contract AuctionFacet {
     // Additional functions for generating random addresses, finding the last interaction address, etc.
 
     function generateRandomAddress() public returns (address) {
-        randNonce++;
+        l.randNonce++;
         bytes32 randomHash = keccak256(
-            abi.encodePacked(block.timestamp, msg.sender, randNonce)
+            abi.encodePacked(block.timestamp, msg.sender, l.randNonce)
         );
         return address(uint160(uint256(randomHash)));
     }

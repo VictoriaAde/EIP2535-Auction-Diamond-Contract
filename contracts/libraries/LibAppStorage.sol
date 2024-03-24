@@ -36,6 +36,7 @@ library LibAppStorage {
         uint256 lastBidTime;
         mapping(uint256 => Auction) auctions;
         uint256 nextAuctionId;
+        uint256 randNonce;
     }
 
     function layoutStorage() internal pure returns (Layout storage l) {
